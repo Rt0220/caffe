@@ -12,6 +12,14 @@
 
 namespace caffe {
 
+template <typename Dtype>
+void caffe_gpu_bound(const int n, const Dtype* a, const Dtype min, 
+    const Dtype max, Dtype* y);
+
+template <typename Dtype>
+void caffe_bound(const int n, const Dtype* a, const Dtype min, 
+    const Dtype max, Dtype* y);
+
 // Caffe gemm provides a simpler interface to the gemm functions, with the
 // limitation that the data has to be contiguous in memory.
 template <typename Dtype>

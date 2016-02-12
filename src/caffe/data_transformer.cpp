@@ -1,5 +1,8 @@
 #ifdef USE_OPENCV
 #include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/highgui/highgui_c.h>
+#include <opencv2/imgproc/imgproc.hpp>
 #endif  // USE_OPENCV
 
 #include <string>
@@ -24,10 +27,33 @@ DataTransformer<Dtype>::DataTransformer(const TransformationParameter& param,
     if (Caffe::root_solver()) {
       LOG(INFO) << "Loading mean file from: " << mean_file;
     }
-    BlobProto blob_proto;
-    ReadProtoFromBinaryFileOrDie(mean_file.c_str(), &blob_proto);
-    data_mean_.FromProto(blob_proto);
+    if ( mean_file.substr(mean_file.length()-3,3) == string("jpg") || mean_file.substr(mean_file.length()-3,3) == string("bmp") ) {
+        cv::Mat mean_img;
+        if ( param.mean_color() ) {
+             mean_img = cv::imread(mean_file.c_str(), CV_LOAD_IMAGE_COLOR);
+             data_mean_.Reshape(1, mean_img.channels(), mean_img.rows, mean_img.cols);
+            int mean_data_index = 0;
+            for ( int k = 0; k < 3; ++k )
+                for ( int r = 0; r < mean_img.rows; ++r )
+                    for ( int c = 0; c < mean_img.cols; ++c )
+                        data_mean_.mutable_cpu_data()[mean_data_index++] = mean_img.at<cv::Vec3b>(r,c)[k];
+        } else { 
+             mean_img = cv::imread(mean_file.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+             data_mean_.Reshape(1, mean_img.channels(), mean_img.rows, mean_img.cols);
+            int mean_data_index = 0;
+                for ( int r = 0; r < mean_img.rows; ++r )
+                    for ( int c = 0; c < mean_img.cols; ++c )
+                        data_mean_.mutable_cpu_data()[mean_data_index++] = mean_img.at<unsigned char>(r,c);
+        }
+    } else {
+        BlobProto blob_proto;
+        ReadProtoFromBinaryFileOrDie(mean_file.c_str(), &blob_proto);
+        data_mean_.FromProto(blob_proto);
+    }
   }
+  offset_w_ = 0;
+  offset_h_ = 0;
+  apply_mirror_ = false;
   // check if we want to use mean_value
   if (param_.mean_value_size() > 0) {
     CHECK(param_.has_mean_file() == false) <<
@@ -224,7 +250,7 @@ void DataTransformer<Dtype>::Transform(const vector<cv::Mat> & mat_vector,
 
 template<typename Dtype>
 void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
-                                       Blob<Dtype>* transformed_blob) {
+                                       Blob<Dtype>* transformed_blob, bool fixed_trans) {
   const int crop_size = param_.crop_size();
   const int img_channels = cv_img.channels();
   const int img_height = cv_img.rows;
@@ -244,7 +270,8 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
   CHECK(cv_img.depth() == CV_8U) << "Image data type must be unsigned byte";
 
   const Dtype scale = param_.scale();
-  const bool do_mirror = param_.mirror() && Rand(2);
+  const bool do_mirror = ( param_.mirror() && Rand(2) ) || (fixed_trans && apply_mirror_);
+  if ( !fixed_trans ) apply_mirror_ = do_mirror;
   const bool has_mean_file = param_.has_mean_file();
   const bool has_mean_values = mean_values_.size() > 0;
 
@@ -283,6 +310,13 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
     } else {
       h_off = (img_height - crop_size) / 2;
       w_off = (img_width - crop_size) / 2;
+    }
+    if ( fixed_trans ) {
+        h_off = offset_h_;
+        w_off = offset_w_;
+    } else {
+        offset_h_ = h_off;
+        offset_w_ = w_off;
     }
     cv::Rect roi(w_off, h_off, crop_size, crop_size);
     cv_cropped_img = cv_img(roi);

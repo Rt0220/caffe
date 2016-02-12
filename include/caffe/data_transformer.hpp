@@ -74,7 +74,7 @@ class DataTransformer {
    *    This is destination blob. It can be part of top blob's data if
    *    set_cpu_data() is used. See image_data_layer.cpp for an example.
    */
-  void Transform(const cv::Mat& cv_img, Blob<Dtype>* transformed_blob);
+  void Transform(const cv::Mat& cv_img, Blob<Dtype>* transformed_blob,  bool fixed_trans = false);
 #endif  // USE_OPENCV
 
   /**
@@ -147,6 +147,9 @@ class DataTransformer {
   Phase phase_;
   Blob<Dtype> data_mean_;
   vector<Dtype> mean_values_;
+  int offset_w_;
+  int offset_h_;
+  int apply_mirror_;
 };
 
 }  // namespace caffe

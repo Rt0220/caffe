@@ -9,6 +9,24 @@
 
 namespace caffe {
 
+
+template <>
+void caffe_bound(const int N, const float* a, const float min, 
+    const float max, float* y) {
+  for (int i = 0; i < N; ++i) {
+    y[i] = std::min(std::max(a[i], min), max);
+  }
+}
+
+template <>
+void caffe_bound(const int N, const double* a, const double min, 
+    const double max, double* y) {
+  for (int i = 0; i < N; ++i) {
+    y[i] = std::min(std::max(a[i], min), max);
+  }
+}
+
+
 template<>
 void caffe_cpu_gemm<float>(const CBLAS_TRANSPOSE TransA,
     const CBLAS_TRANSPOSE TransB, const int M, const int N, const int K,
